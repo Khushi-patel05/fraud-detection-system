@@ -8,29 +8,33 @@ A full-stack fraud detection and transaction monitoring system designed to ident
 
 The system provides a centralized interface for fraud analysts and administrators to review transactions, evaluate risk scores, manage cases, record investigation notes, and inspect audit trails.
 
+By combining structured relational records with flexible document-oriented risk-analysis data, SentinelAI demonstrates how multiple database technologies can work together in a financial fraud monitoring application.
+
 ## 🎯 Objectives
 
 - Monitor financial transactions and identify potentially suspicious activity.
 - Assign risk scores and risk categories using rule-based analysis.
 - Generate and manage fraud alerts.
-- Track investigations, case status, priorities, conclusions, and notes.
+- Track investigation cases, priorities, conclusions, and notes.
 - Maintain audit logs for important system activities.
 - Enforce authentication and role-based access control.
-- Combine relational transaction data with flexible risk-analysis documents.
+- Integrate relational transaction data with flexible risk-analysis documents.
 
 ## ✨ Key Features
 
 - **Dashboard:** Centralized overview of transaction monitoring and fraud management.
 - **Transaction Monitoring:** View and inspect transaction records.
-- **Risk Analysis:** Calculate and display transaction risk scores and categories.
-- **Fraud Alert Management:** Review alerts and manage their statuses.
+- **Risk Analysis:** Calculate and display transaction risk scores, categories, and associated risk information.
+- **Fraud Alert Management:** Review fraud alerts and manage their statuses.
 - **Investigation Management:** Track investigation cases, priorities, conclusions, and progress.
-- **Investigation Notes:** Record and retrieve notes associated with cases.
-- **Audit Logs:** Review important actions and status changes.
+- **Investigation Notes:** Record and retrieve notes associated with investigation cases.
+- **Audit Logs:** Review important system activities and applicable status changes.
 - **Customer View:** Access customer-related information.
 - **Authentication:** Sign in using configured user credentials.
 - **Role-Based Access Control:** Separate administrator and fraud analyst permissions.
 - **Database Connectivity:** Integrate MySQL and MongoDB.
+- **Transaction Audit:** Combine relational transaction records with corresponding MongoDB risk-analysis results.
+- **Paginated Data Retrieval:** Retrieve transaction records through paginated API requests.
 - **Administrative Diagnostics:** Provide protected database connectivity checks.
 
 ## 🛠️ Technology Stack
@@ -51,19 +55,31 @@ The system provides a centralized interface for fraud analysts and administrator
 
 ## 🏗️ System Architecture
 
-The application follows a full-stack architecture:
+The application follows a full-stack architecture consisting of the following layers:
 
-1. **Presentation Layer:** Provides the dashboard, transaction views, fraud alerts, investigations, audit logs, and login interface.
-2. **Application Layer:** Next.js API routes handle requests, validation, authentication, authorization, and business logic.
-3. **Relational Data Layer:** MySQL stores structured records such as users, customers, transactions, alerts, investigations, notes, and audit logs.
-4. **Document Data Layer:** MongoDB stores flexible risk-analysis results and related behavioral or investigation data.
-5. **Security Layer:** NextAuth.js authentication and role checks protect application pages and API endpoints.
+1. **Presentation Layer:** Provides the dashboard, transaction views, fraud alerts, investigations, audit logs, customer information, and login interface.
+
+2. **Application Layer:** Next.js API routes handle client requests, authentication, authorization, input validation, database operations, and application logic.
+
+3. **Relational Data Layer (MySQL):** Stores structured records such as users, customers, accounts, transactions, fraud alerts, investigation cases, case notes, and audit logs.
+
+4. **Document Data Layer (MongoDB):** Stores flexible risk-analysis results and related document-oriented information.
+
+5. **Security Layer:** Uses NextAuth.js authentication and role-based authorization to protect application pages and API endpoints.
+
+### Database Integration
+
+MySQL acts as the primary relational database for structured transaction and fraud-management records.
+
+MongoDB complements MySQL by storing risk-analysis documents that can be associated with individual transactions.
+
+The transaction-audit API retrieves paginated transaction records from MySQL and combines them with the corresponding latest risk-analysis documents from MongoDB.
 
 ## 🗄️ Database Design
 
 ### MySQL
 
-The relational database contains tables for:
+The relational database contains tables for structured application data, including:
 
 - `users`
 - `customers`
@@ -74,16 +90,20 @@ The relational database contains tables for:
 - `case_notes`
 - `audit_logs`
 - `behavior_profiles`
-- `student_phone` and other schema-specific tables, if present in the configured database
+- Other schema-specific tables, if present in the configured database.
 
 The application also uses the following monitoring views:
 
 - `v_transaction_monitoring`
 - `v_fraud_alert_dashboard`
 
+These views support transaction monitoring and fraud-alert dashboard operations.
+
 ### MongoDB
 
-MongoDB supports document-oriented data storage for collections including:
+MongoDB supports document-oriented storage for flexible risk-analysis and related information.
+
+Collections used or supported by the project include:
 
 - `risk_analysis`
 - `behavior_events`
@@ -98,18 +118,18 @@ The project incorporates the following security measures:
 - Credential-based authentication.
 - Password verification using bcrypt.
 - Role-based authorization for administrative operations.
-- Server-side protection for API endpoints.
+- Server-side protection for supported API endpoints.
 - Input validation for supported operations.
 - Audit logging for selected investigation and alert activities.
 - Environment variables for database and authentication configuration.
 
-**Security note:** Never commit `.env.local`, database passwords, authentication secrets, session tokens, or other sensitive credentials to version control.
+**Security Note:** Never commit `.env.local`, database passwords, authentication secrets, session tokens, or other sensitive credentials to version control.
 
 ## ⚙️ Prerequisites
 
 Install the following before running the project:
 
-- Node.js (a compatible version; the project was tested with Node.js 22).
+- Node.js (the project was tested with Node.js 22).
 - npm.
 - MySQL Server.
 - MongoDB Server or a configured MongoDB deployment.
@@ -117,24 +137,27 @@ Install the following before running the project:
 
 ## 🚀 Getting Started
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Khushi-patel05/fraud-detection-system.git
+
 cd fraud-detection-system
 ```
 
-### 2. Install dependencies
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Configure environment variables
+### 3. Configure Environment Variables
 
-Create a local `.env.local` file in the project root. Configure the database connection values and authentication settings required by the application.
+Create a local `.env.local` file in the project root.
 
-Typical configuration keys may include:
+Configure the database connection values and authentication settings required by the application.
+
+The following are illustrative configuration keys. Use the exact variable names expected by the project's database and authentication configuration files.
 
 ```env
 # MySQL connection settings
@@ -152,26 +175,57 @@ NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=
 ```
 
-Use the **exact variable names expected by the project's database and authentication configuration files**. Do not commit this file or use production credentials in a public repository.
+**Important:**
+- Use the exact environment variable names expected by the application.
+- Configure valid MySQL and MongoDB connection details.
+- Generate a secure authentication secret.
+- Keep `.env.local` local and do not commit it to GitHub.
+- Do not use production credentials in a public repository.
 
-### 4. Configure the databases
+### 4. Configure the Databases
 
-- Start MySQL and create/configure the required project database.
-- Create or import the tables, relationships, and monitoring views expected by the application.
-- Start MongoDB or configure the appropriate MongoDB URI.
-- Ensure the application database account has only the permissions it needs.
+**MySQL Setup**
 
-Database schemas and sample data should be provided separately if required for reproducible setup.
+- Start the MySQL server.
+- Create or configure the project database.
+- Create or import the required tables and relationships.
+- Configure the monitoring views expected by the application.
+- Ensure that the database user has the required permissions.
 
-### 5. Start the development server
+**MongoDB Setup**
+
+- Start MongoDB or configure a MongoDB deployment.
+- Configure the MongoDB connection URI.
+- Create or populate the required collections.
+- Ensure the application can access the required collections.
+
+The application expects the database schema and views used by its API routes to be available before the dashboard can retrieve the corresponding information.
+
+### 5. Populate MongoDB Risk-Analysis Data
+
+The repository includes a MongoDB seeding script:
+
+```bash
+node scripts/seed-mongodb.cjs
+```
+
+This script uses the configured environment variables to connect to the databases and populate MongoDB with risk-analysis documents based on the available transaction data.
+
+Run the script only after configuring the required database connections and ensuring that the expected MySQL transaction data is available.
+
+### 6. Start the Development Server
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open the following address in your browser:
 
-### 6. Create a production build
+```text
+http://localhost:3000
+```
+
+### 7. Create a Production Build
 
 ```bash
 npm run build
@@ -185,23 +239,28 @@ npm start
 
 ## 🧪 Testing and Verification
 
-The project can be verified through the following checks:
+The following checks can be used to verify the application:
 
 - Confirm that the application builds successfully.
-- Verify login and logout behavior.
+- Verify login and logout functionality.
 - Verify that unauthenticated requests to protected endpoints are rejected.
-- Verify that analyst accounts cannot access administrator-only endpoints.
-- Test transaction monitoring and risk-analysis responses.
-- Test fraud alert status changes and investigation workflows.
-- Verify that investigation notes and applicable audit entries are recorded.
-- Test MySQL and MongoDB connectivity using authorized diagnostic endpoints.
+- Verify that analyst accounts cannot access administrator-only operations.
+- Test transaction monitoring and paginated data retrieval.
+- Verify that transaction records are combined with MongoDB risk-analysis results.
+- Test fraud-alert status changes.
+- Test investigation workflows, notes, and applicable audit entries.
+- Verify MySQL and MongoDB connectivity using authorized diagnostic endpoints.
 
-Actual results depend on the configured databases and test data.
+Actual results depend on the configured databases, application permissions, and available test data.
 
 ## 📁 Project Structure
 
 ```text
 fraud-detection-system/
+│
+├── scripts/
+│   └── seed-mongodb.cjs
+│
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -215,17 +274,21 @@ fraud-detection-system/
 │   │   │   ├── transaction-audit/
 │   │   │   ├── transactions/
 │   │   │   └── users/
+│   │   │
 │   │   ├── login/
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
+│   │
 │   ├── lib/
 │   │   ├── api-auth.ts
 │   │   ├── auth.ts
 │   │   ├── db.ts
 │   │   └── mongo.ts
+│   │
 │   ├── middleware.ts
 │   └── types/
+│
 ├── public/
 ├── .gitignore
 ├── package.json
@@ -233,14 +296,15 @@ fraud-detection-system/
 └── README.md
 ```
 
-*This is a high-level representation of the application structure; additional files may exist in the repository.*
+*Note: This is a high-level representation of the project structure. Additional files and directories may exist in the repository.*
 
 ## ⚠️ Scope and Limitations
 
 - Risk scoring is **rule-based**, not a trained machine-learning model.
-- Detection quality depends on the rules, transaction data, and configured thresholds.
-- The system is intended as an academic mini project and demonstration, not as a production-ready financial fraud prevention platform.
-- Production deployment would require additional security hardening, operational monitoring, privacy controls, and extensive validation.
+- Detection quality depends on the implemented rules, transaction data, and configured thresholds.
+- The system is intended as an academic DBMS mini project and demonstration, not as a production-ready financial fraud prevention platform.
+- The effectiveness of fraud detection depends on the completeness and quality of the available data.
+- Production deployment would require additional security hardening, operational monitoring, privacy controls, scalability improvements, and extensive validation.
 
 ## 🔮 Future Enhancements
 
@@ -261,7 +325,13 @@ fraud-detection-system/
 
 ## 🎓 Project Information
 
-**Project Title:** Automated Fraud Detection & Behavioral Transaction Audit System  
-**Project Name:** SentinelAI  
-**Project Type:** DBMS Mini Project  
-**Repository:** [Khushi-patel05/fraud-detection-system](https://github.com/Khushi-patel05/fraud-detection-system)
+| Field | Details |
+|---|---|
+| Project Title | Automated Fraud Detection & Behavioral Transaction Audit System |
+| Project Name | SentinelAI |
+| Project Type | DBMS Mini Project |
+| Repository | [fraud-detection-system](https://github.com/Khushi-patel05/fraud-detection-system) |
+
+---
+
+**SentinelAI — Making Transaction Monitoring More Transparent, Structured, and Explainable.**
