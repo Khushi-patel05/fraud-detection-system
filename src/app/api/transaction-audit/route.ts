@@ -29,34 +29,73 @@ interface LatestAnalysisResult extends Document {
   analysis: RiskAnalysisDocument;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireApiAuth();
 
   if (auth.response) return auth.response;
 
   try {
-    // Fetch the most recent transactions from MySQL.
-    const [transactions] = await pool.query<TransactionRow[]>(`
-      SELECT
-        transaction_id,
-        transaction_reference,
-        customer_id,
-        customer_name,
-        amount,
-        transaction_location,
-        transaction_status,
-        transaction_time,
-        max_normal_amount,
-        usual_location
+    const { searchParams } = new URL(request.url);
+
+    const requestedPage = Number.parseInt(
+      searchParams.get("page") ?? "1",
+      10
+    );
+
+    const requestedPageSize = Number.parseInt(
+      searchParams.get("pageSize") ?? "500",
+      10
+    );
+
+    const page =
+      Number.isFinite(requestedPage) && requestedPage > 0
+        ? requestedPage
+        : 1;
+
+    const pageSize =
+      Number.isFinite(requestedPageSize) && requestedPageSize > 0
+        ? Math.min(requestedPageSize, 500)
+        : 500;
+
+    const offset = (page - 1) * pageSize;
+
+    // Get the total number of transactions.
+    const [countRows] = await pool.query<RowDataPacket[]>(`
+      SELECT COUNT(*) AS total
       FROM v_transaction_monitoring
-      ORDER BY transaction_time DESC
-      LIMIT 100
     `);
 
-    // Avoid an unnecessary MongoDB query when no transactions exist.
+    const total = Number(countRows[0]?.total ?? 0);
+    const totalPages = Math.ceil(total / pageSize);
+
+    // Fetch the requested transaction page from MySQL.
+    const [transactions] = await pool.query<TransactionRow[]>(
+      `
+        SELECT
+          transaction_id,
+          transaction_reference,
+          customer_id,
+          customer_name,
+          amount,
+          transaction_location,
+          transaction_status,
+          transaction_time,
+          max_normal_amount,
+          usual_location
+        FROM v_transaction_monitoring
+        ORDER BY transaction_time DESC, transaction_id DESC
+        LIMIT ? OFFSET ?
+      `,
+      [pageSize, offset]
+    );
+
     if (transactions.length === 0) {
       return NextResponse.json({
         success: true,
+        page,
+        pageSize,
+        total,
+        totalPages,
         count: 0,
         analyzedCount: 0,
         data: [],
@@ -66,16 +105,18 @@ export async function GET() {
     const client = await clientPromise;
     const database = client.db("fraud_detection_db");
 
-    // Retrieve only the newest risk analysis for each transaction.
+    // Retrieve the latest MongoDB risk analysis for each transaction.
+    const transactionIds = transactions.map((transaction) =>
+      Number(transaction.transaction_id)
+    );
+
     const analyses = await database
       .collection<RiskAnalysisDocument>("risk_analysis")
       .aggregate<LatestAnalysisResult>([
         {
           $match: {
             transactionId: {
-              $in: transactions.map((transaction) =>
-                Number(transaction.transaction_id)
-              ),
+              $in: transactionIds,
             },
           },
         },
@@ -95,16 +136,13 @@ export async function GET() {
       ])
       .toArray();
 
-    const latestAnalysis = new Map<
-      number,
-      RiskAnalysisDocument
-    >();
+    const latestAnalysis = new Map<number, RiskAnalysisDocument>();
 
     for (const item of analyses) {
       latestAnalysis.set(Number(item._id), item.analysis);
     }
 
-    // Combine MySQL transaction details with their latest MongoDB analysis.
+    // Combine MySQL transaction details with their MongoDB risk analyses.
     const data = transactions.map((transaction) => ({
       ...transaction,
       riskAnalysis:
@@ -113,6 +151,10 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      page,
+      pageSize,
+      total,
+      totalPages,
       count: data.length,
       analyzedCount: data.filter(
         (transaction) => transaction.riskAnalysis !== null

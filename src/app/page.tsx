@@ -226,19 +226,38 @@ export default function Home() {
       setLoading(true);
       setApiError("");
 
-      const response = await fetch("/api/transaction-audit", {
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error("Failed to load transaction data.");
+      // The audit API combines MySQL transaction details with the saved
+      // MongoDB risk analysis. Load it in pages so every transaction is used.
+      const pageSize = 500;
+      let page = 1;
+      let totalPages = 1;
+      const allRows: AuditTransaction[] = [];
 
-      const result = await response.json();
-      if (!result.success || !Array.isArray(result.data)) {
-        throw new Error("The transaction API returned an invalid response.");
-      }
+      do {
+        const response = await fetch(
+          `/api/transaction-audit?page=${page}&pageSize=${pageSize}`,
+          { cache: "no-store" }
+        );
 
-      const mapped: DashboardTransaction[] = (
-        result.data as AuditTransaction[]
-      ).map((transaction) => {
+        const result = await response.json();
+        if (!response.ok || !result.success || !Array.isArray(result.data)) {
+          throw new Error(
+            result.message ?? result.error ?? "Failed to load transaction data."
+          );
+        }
+
+        allRows.push(...(result.data as AuditTransaction[]));
+        totalPages = Number(result.totalPages ?? 1);
+
+        // Prevent a malformed API response from causing an endless loop.
+        if (!Number.isFinite(totalPages) || totalPages < 1) {
+          throw new Error("The transaction API returned invalid pagination data.");
+        }
+
+        page += 1;
+      } while (page <= totalPages);
+
+      const mapped: DashboardTransaction[] = allRows.map((transaction) => {
         const score = Number(transaction.riskAnalysis?.riskScore ?? 0);
 
         return {
@@ -774,7 +793,11 @@ export default function Home() {
 
   return (
     <main className="dashboard">
-      <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
+      <aside
+        className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}
+        style={{ zIndex: 30, pointerEvents: "auto" }}
+        aria-label="Main navigation"
+      >
         <div className="brand">
           <div className="brand-icon"><Shield size={24} /></div>
           <div><h2>Sentinel<span>AI</span></h2><p>FRAUD INTELLIGENCE</p></div>
@@ -784,7 +807,21 @@ export default function Home() {
         <div className="workspace-label">WORKSPACE</div>
         <div className="nav-list">
           {navigation.map(({ label, icon: Icon }) => (
-            <button key={label} className={`nav-item ${active === label ? "nav-active" : ""}`} onClick={() => { setActive(label); setMenuOpen(false); setSelectedTransaction(null); setAlertMessage(""); setAlertError(""); resetFilters(); }}>
+            <button
+              key={label}
+              type="button"
+              aria-current={active === label ? "page" : undefined}
+              className={`nav-item ${active === label ? "nav-active" : ""}`}
+              style={{ position: "relative", zIndex: 31, pointerEvents: "auto", cursor: "pointer" }}
+              onClick={() => {
+                setActive(label);
+                setMenuOpen(false);
+                setSelectedTransaction(null);
+                setAlertMessage("");
+                setAlertError("");
+                resetFilters();
+              }}
+            >
               <Icon size={19} /><span>{label}</span>
               {label === "Fraud Alerts" && <span className="nav-count">{openAlerts.length}</span>}
             </button>
@@ -819,7 +856,7 @@ export default function Home() {
           <div className="topbar-left"><button className="mobile-menu" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Menu /></button><div className="breadcrumb">Workspace <span>/</span> <strong>{active}</strong></div></div>
           <div className="topbar-actions">
             <div className="search-box"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={active === "Fraud Alerts" ? "Search alerts..." : "Search transactions..."} aria-label="Search" /><kbd>⌘ K</kbd></div>
-            <button className="icon-button notification-button" aria-label="Open fraud alerts" onClick={() => setActive("Fraud Alerts")}><Bell size={19} /><span /></button>
+            <button type="button" className="icon-button notification-button" aria-label="Open fraud alerts" onClick={() => setActive("Fraud Alerts")}><Bell size={19} /><span /></button>
             <button
               type="button"
               className="top-avatar"

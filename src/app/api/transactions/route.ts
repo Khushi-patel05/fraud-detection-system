@@ -21,35 +21,64 @@ interface TransactionRow extends RowDataPacket {
   usual_location: string | null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireApiAuth();
   if (auth.response) return auth.response;
 
   try {
-    const [rows] = await pool.query<TransactionRow[]>(`
-      SELECT
-        transaction_id,
-        transaction_reference,
-        customer_id,
-        customer_name,
-        account_number,
-        transaction_type,
-        amount,
-        merchant,
-        transaction_location,
-        transaction_status,
-        transaction_time,
-        avg_transaction_amount,
-        max_normal_amount,
-        usual_location
+    const { searchParams } = new URL(request.url);
+
+    const requestedLimit = Number(searchParams.get("limit") ?? 100);
+    const requestedOffset = Number(searchParams.get("offset") ?? 0);
+
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(500, Math.max(1, Math.floor(requestedLimit)))
+      : 100;
+
+    const offset = Number.isFinite(requestedOffset)
+      ? Math.min(1_000_000, Math.max(0, Math.floor(requestedOffset)))
+      : 0;
+
+    const [rows] = await pool.query<TransactionRow[]>(
+      `
+        SELECT
+          transaction_id,
+          transaction_reference,
+          customer_id,
+          customer_name,
+          account_number,
+          transaction_type,
+          amount,
+          merchant,
+          transaction_location,
+          transaction_status,
+          transaction_time,
+          avg_transaction_amount,
+          max_normal_amount,
+          usual_location
+        FROM v_transaction_monitoring
+        ORDER BY transaction_time DESC, transaction_id DESC
+        LIMIT ? OFFSET ?
+      `,
+      [limit, offset]
+    );
+
+    const [countRows] = await pool.query<
+      (RowDataPacket & { total: number })[]
+    >(`
+      SELECT COUNT(*) AS total
       FROM v_transaction_monitoring
-      ORDER BY transaction_time DESC
-      LIMIT 100
     `);
+
+    const total = Number(countRows[0].total);
 
     return NextResponse.json({
       success: true,
       count: rows.length,
+      total,
+      limit,
+      offset,
+      hasMore: offset + rows.length < total,
       data: rows,
     });
   } catch (error) {
